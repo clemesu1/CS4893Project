@@ -1,17 +1,28 @@
 package com.clemesu1.networkchat.server;
 
 import java.io.*;
+import java.math.BigInteger;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
+
 
 public class Server implements Runnable {
 
     private final String FILE_LOCATION = "C:\\Users\\coliw\\Documents\\FileServer\\";
+    private final String USER_DATA_LOCATION = "C:\\Users\\coliw\\OneDrive\\Documents\\Project\\NetworkChat\\src\\com\\clemesu1\\networkchat\\server\\user_data.csv";
 
     private List<ServerClient> clients = new ArrayList<>();
     private List<File> files = new ArrayList<>(Arrays.asList((new File(FILE_LOCATION).listFiles())));
     private List<Integer> clientResponse = new ArrayList<>();
+
+    private Map<String, String> userPasswordMap = new HashMap<>();
+    private Map<String, Integer> userSaltMap = new HashMap<>();
+    private Map<String, Integer> userIDMap = new HashMap<>();
+
+    private File userData = new File(USER_DATA_LOCATION);
 
     private DatagramSocket socket;
     private ServerSocket serverSocket;
@@ -44,15 +55,18 @@ public class Server implements Runnable {
         running = true;
         System.out.println("Server started on port " + port + "...");
         manageClients();
+        readUserData();
         if (clientSocket == null) {
             try {
                 clientSocket = serverSocket.accept();
                 output = new ObjectOutputStream(clientSocket.getOutputStream());
                 input = new ObjectInputStream(clientSocket.getInputStream());
+
             } catch (IOException ioException) {
                 ioException.printStackTrace();
             }
         }
+
         receive();
 
         Scanner scan = new Scanner(System.in);
@@ -112,6 +126,40 @@ public class Server implements Runnable {
             }
         }
         scan.close();
+    }
+
+    private void readUserData() {
+        if (userData.isFile()) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(userData))) {
+
+                // Read CSV header
+                reader.readLine();
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String[] data = line.split(",");
+
+                    userPasswordMap.put(data[0], data[1]);
+                    userSaltMap.put(data[0], Integer.parseInt(data[2]));
+                    userIDMap.put(data[0], Integer.parseInt(data[3]));
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            try (PrintWriter writer = new PrintWriter(new FileWriter(userData, true), true)) {
+                writer.append("Username");
+                writer.append(",");
+                writer.append("Password");
+                writer.append(",");
+                writer.append("Salt");
+                writer.append(",");
+                writer.append("ID");
+                writer.append("\n");
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
+        }
     }
 
     private void printHelp() {
@@ -230,17 +278,51 @@ public class Server implements Runnable {
         String string = new String(data);
         if (raw) System.out.println(string);
         if (string.startsWith("/c/")) {
-            String name = string.split("/c/|/e/")[1];
-            UUID uuid = UUID.randomUUID();
-            int ID = Math.abs((int) uuid.getLeastSignificantBits());
-            System.out.println("User " + name + " (" + ID + ") @ " + packet.getAddress() + ":" + packet.getPort() + " connected.");
-            String online = "/m/User " + name + " has connected./e/";
-            sendToAll(online);
-            clients.add(new ServerClient(name, packet.getAddress(), packet.getPort(), ID));
-            String id = "/c/" + ID;
-            send(id, packet.getAddress(), packet.getPort());
-            updateUsers();
-            updateFiles();
+            /* Connection Packet */
+
+            // Get username, password and user command.
+            String name = string.split("/c/|/p/|/b/|/e/")[1];
+            String password = string.split("/c/|/p/|/b/|/e/")[2];
+            String command =  string.split("/c/|/p/|/b/|/e/")[3];
+
+            int ID = 0;
+            if (command.equals("register")) {
+                if (!isUsernameTaken(name)) {
+                    ID = Math.abs((int) UUID.randomUUID().getLeastSignificantBits());
+                    registerAccount(name, password, ID);
+                }
+            } else if (command.equals("login")) {
+                if (!isLoginCorrect(name, password)) {
+                    // Invalid username.
+                    String error = "/error/Login";
+                    send(error, packet.getAddress(), packet.getPort());
+                } else if (!isPasswordCorrect(name, password)) {
+                    // Invalid password.
+                    String error = "/error/Password";
+                    send(error, packet.getAddress(), packet.getPort());
+                } else {
+                    // No errors detected. Attempting login.
+
+                    // Get ID from ID hashmap.
+                    ID = userIDMap.get(name);
+
+                    // Send user connection alert.
+                    System.out.println("User " + name + " (" + ID + ") @ " + packet.getAddress() + ":" + packet.getPort() + " connected.");
+                    String online = "/m/User " + name + " has connected./e/";
+                    sendToAll(online);
+
+                    // Add client to list of clients.
+                    clients.add(new ServerClient(name, packet.getAddress(), packet.getPort(), ID));
+
+                    // send ID to user
+                    String id = "/c/" + ID;
+                    send(id, packet.getAddress(), packet.getPort());
+
+                    // Update users and files.
+                    updateUsers();
+                    updateFiles();
+                }
+            }
         } else if (string.startsWith("/m/")) {
             sendToAll(string);
         } else if (string.startsWith("/d/")) {
@@ -260,6 +342,76 @@ public class Server implements Runnable {
             sendToUser(string);
         } else {
             System.out.println(string);
+        }
+    }
+
+    public boolean isUsernameTaken(String username) {
+        return userPasswordMap.containsKey(username);
+    }
+
+    private void registerAccount(String username, String password, int ID) {
+        int salt = getRandomSalt();
+        String saltedPassword = password + salt;
+        String passwordHash = getSimpleHash(saltedPassword);
+        userPasswordMap.put(username, passwordHash);
+        userSaltMap.put(username, salt);
+        userIDMap.put(username, ID);
+
+        writeUserData(username, passwordHash, salt, ID);
+    }
+
+    private void writeUserData(String username, String passwordHash, int salt, int ID) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(userData, true), true)) {
+            List<String> rowData = Arrays.asList(username, passwordHash, String.valueOf(salt), String.valueOf(ID));
+            writer.append(String.join(",", rowData));
+            writer.append("\n");
+        } catch (IOException ioException) {
+            ioException.printStackTrace();
+        }
+    }
+
+    private boolean isPasswordCorrect(String username, String password) {
+        int salt = userSaltMap.get(username);
+        String saltedPassword = password + salt;
+        String passwordHash = getSimpleHash(saltedPassword);
+        String storedPasswordHash = userPasswordMap.get(username);
+
+        return passwordHash.equals(storedPasswordHash);
+    }
+
+    public boolean isLoginCorrect(String username, String password) {
+        // Username is not registered.
+        if (!userPasswordMap.containsKey(username) || !userSaltMap.containsKey(username)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
+     * Returns a random number between 0 and 1000.
+     */
+    private int getRandomSalt() {
+        return (int) (Math.random() * 1000);
+    }
+
+    /**
+     * https://www.geeksforgeeks.org/sha-512-hash-in-java/
+     * Returns a hash for the given password.
+     */
+    private String getSimpleHash(String password) {
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-512");
+            byte[] messageDigest = sha.digest(password.getBytes(StandardCharsets.UTF_8));
+            BigInteger no = new BigInteger(1, messageDigest);
+            String hashText = no.toString(16);
+            while (hashText.length() < 32) {
+                hashText = "0" + hashText;
+            }
+            return hashText;
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            return null;
         }
     }
 

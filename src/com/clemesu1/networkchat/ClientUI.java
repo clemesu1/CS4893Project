@@ -1,5 +1,7 @@
 package com.clemesu1.networkchat;
 
+import com.sun.deploy.appcontext.AppContext;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.ListSelectionEvent;
@@ -38,23 +40,36 @@ public class ClientUI extends JFrame implements Runnable {
     private boolean running = false;
 
     private File selectedFile;
+    private JFrame loginWindow;
 
-    public ClientUI(String name, String address, int port) {
+    public ClientUI(String name, String password, String address, int port, boolean isLogin, JFrame loginWindow) {
+        this.loginWindow = loginWindow;
+
         setTitle("Chat Client");
-        client = new Client(name, address, port);
+        client = new Client(name, password, address, port);
 
         boolean connect = client.openConnection(address, port);
+
         if (!connect) {
             System.err.println("Connection failed!");
             console("Connection failed!");
         }
-        createWindow();
+
         console("Attempting to connect to " + address + ":" + port + ", user: " + name);
-        String connection = "/c/" + name + "/e/";
-        client.send(connection.getBytes(StandardCharsets.UTF_8));
-        running = true;
-        run = new Thread(this, "Running");
-        run.start();
+
+        if (isLogin) {
+            // User logging into existing account.
+            String connection = "/c/" + name + "/p/" + password + "/b/login/e/";
+            client.send(connection.getBytes(StandardCharsets.UTF_8));
+            createWindow();
+            running = true;
+            run = new Thread(this, "Running");
+            run.start();
+        } else {
+            // User creating account.
+            String connection = "/c/" + name + "/p/" + password + "/b/register/e/";
+            client.send(connection.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     private void createWindow() {
@@ -151,7 +166,6 @@ public class ClientUI extends JFrame implements Runnable {
             }
         });
 
-        setVisible(true);
         txtMessage.requestFocusInWindow();
     }
 
@@ -219,6 +233,8 @@ public class ClientUI extends JFrame implements Runnable {
                 while (running) {
                     String message = client.receive();
                     if (message.startsWith("/c/")) {
+                        setVisible(true);
+                        loginWindow.dispose();
                         client.setID(Integer.parseInt(message.split("/c/|/e/")[1]));
                         console("Successfully connected to server! ID: " + client.getID());
                     } else if (message.startsWith("/m/")) {
@@ -237,6 +253,13 @@ public class ClientUI extends JFrame implements Runnable {
                     } else if (message.startsWith("/mu/")) {
                         String messageReceived = message.split("/mu/|/n/|/e/")[2];
                         messagePane.receiveMessage(messageReceived);
+                    } else if (message.startsWith("/error/")) {
+                        String error = message.split("/error/|/e/")[1];
+                        if (error.equals("Login")) {
+                            JOptionPane.showMessageDialog(null, "Invalid Username", "Error", JOptionPane.ERROR_MESSAGE);
+                        } else if (error.equals("Password")) {
+                            JOptionPane.showMessageDialog(null, "Invalid Password", "Error", JOptionPane.ERROR_MESSAGE);
+                        }
                     } else {
                         System.out.println(message.substring(3));
                     }

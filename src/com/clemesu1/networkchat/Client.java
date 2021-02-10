@@ -5,7 +5,7 @@ import java.net.*;
 
 public class Client {
 
-    private String name, address;
+    private String name, password, address;
     private int port;
     private DatagramSocket socket;
     private Socket clientSocket;
@@ -16,14 +16,19 @@ public class Client {
     private ObjectInputStream input;
     private ObjectOutputStream output;
 
-    public Client(String name, String address, int port) {
+    public Client(String name, String password, String address, int port) {
         this.name = name;
+        this.password = password;
         this.address = address;
         this.port = port;
     }
 
     public String getName() {
         return name;
+    }
+
+    public String getPassword() {
+        return password;
     }
 
     public String getAddress() {
@@ -33,6 +38,7 @@ public class Client {
     public int getPort() {
         return port;
     }
+
 
     public boolean openConnection(String address, int port) {
         try {

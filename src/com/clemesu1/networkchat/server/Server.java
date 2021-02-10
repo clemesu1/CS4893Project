@@ -10,7 +10,7 @@ public class Server implements Runnable {
     private final String FILE_LOCATION = "C:\\Users\\coliw\\Documents\\FileServer\\";
 
     private List<ServerClient> clients = new ArrayList<>();
-    private List<File> files = new ArrayList<File>(Arrays.asList((new File(FILE_LOCATION).listFiles())));
+    private List<File> files = new ArrayList<>(Arrays.asList((new File(FILE_LOCATION).listFiles())));
     private List<Integer> clientResponse = new ArrayList<>();
 
     private DatagramSocket socket;
@@ -130,9 +130,8 @@ public class Server implements Runnable {
             public void run() {
                 while (running) {
                     sendToAll("/i/server");
-                    sendStatus();
                     try {
-                        Thread.sleep(2000);
+                        Thread.sleep(20000);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -154,7 +153,7 @@ public class Server implements Runnable {
         };
         manage.start();
     }
-    private void sendStatus() {
+    private void updateUsers() {
         if (clients.size() <= 0) return;
         String users = "/u/";
         for (int i=0; i<clients.size()-1; i++) {
@@ -194,6 +193,19 @@ public class Server implements Runnable {
         }
     }
 
+    private void sendToUser(String message) {
+        String toUser = message.split("/mu/|/n/|/e/")[1];
+        String text = message.split("/mu/|/n/|/e/")[2];
+        System.out.println(text + " -> " + toUser);
+
+        for (ServerClient client : clients) {
+            if (client.getName().equals(toUser)) {
+                send(message.getBytes(StandardCharsets.UTF_8), client.address, client.port);
+                break;
+            }
+        }
+    }
+
     private void send(String message, InetAddress address, int port) {
         message += "/e/";
         send(message.getBytes(StandardCharsets.UTF_8), address, port);
@@ -227,12 +239,14 @@ public class Server implements Runnable {
             clients.add(new ServerClient(name, packet.getAddress(), packet.getPort(), ID));
             String id = "/c/" + ID;
             send(id, packet.getAddress(), packet.getPort());
+            updateUsers();
             updateFiles();
         } else if (string.startsWith("/m/")) {
             sendToAll(string);
         } else if (string.startsWith("/d/")) {
             String id = string.split("/d/|/e/")[1];
             disconnect(Integer.parseInt(id), true);
+            updateUsers();
         } else if (string.startsWith("/i/")) {
             clientResponse.add(Integer.valueOf(string.split("/i/|/e/")[1]));
         } else if (string.startsWith("/up/")) {
@@ -241,6 +255,9 @@ public class Server implements Runnable {
         } else if (string.startsWith("/down/")) {
             String fileName = string.split("/down/|/e/")[1];
             sendFile(fileName);
+        } else if (string.startsWith("/mu/")) {
+            // /mu/<Username>/n/<Message>/e/
+            sendToUser(string);
         } else {
             System.out.println(string);
         }
@@ -322,12 +339,18 @@ public class Server implements Runnable {
 
         if (!existed) return;
 
-        String message = "";
+        String message = "", send = "";
         if (status) {
             message = "User " + c.name + " (" + c.getID() + ") @ " + c.address.toString() + ":" + c.port + " disconnected.";
+            send = "User " + c.name + " has disconnected.";
+            sendToAll(send);
+
         } else {
             message = "User " + c.name + " (" + c.getID() + ") @ " + c.address.toString() + ":" + c.port + " timed out.";
+            send = "User " + c.name + " has timed out.";
+
         }
         System.out.println(message);
+        sendToAll("/m/" + send + "/e/");
     }
 }

@@ -27,6 +27,9 @@ public class ClientUI extends JFrame implements Runnable {
     private JPanel interfacePanel;
     private JPanel mediaPanel;
     private JLabel lblFileSelected;
+    private JPopupMenu popupMenu;
+    private JMenuItem directMessage;
+    private MessagePane messagePane;
 
     private DefaultCaret caret;
     private Thread run, listen;
@@ -52,7 +55,6 @@ public class ClientUI extends JFrame implements Runnable {
         running = true;
         run = new Thread(this, "Running");
         run.start();
-
     }
 
     private void createWindow() {
@@ -68,6 +70,10 @@ public class ClientUI extends JFrame implements Runnable {
 
         caret = (DefaultCaret) txtHistory.getCaret();
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+
+        popupMenu = new JPopupMenu("Message");
+        directMessage = new JMenuItem("Direct Message");
+        popupMenu.add(directMessage);
 
         txtMessage.addKeyListener(new KeyAdapter() {
             @Override
@@ -122,6 +128,29 @@ public class ClientUI extends JFrame implements Runnable {
                 client.close();
             }
         });
+        
+        userList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    userList.setSelectedIndex(userList.locationToIndex(e.getPoint())); // Highlight right-clicked value in list.
+                    popupMenu.show(e.getComponent(), e.getX(), e.getY()); // Show popup menu
+                }
+            }
+        });
+
+        directMessage.addActionListener(e -> {
+            String username = userList.getSelectedValue();
+            if (!client.getName().equals(username)) {
+                messagePane = new MessagePane(client, username);
+                JFrame f = new JFrame("Message: " + username);
+                f.setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+                f.setSize(500, 500);
+                f.getContentPane().add(messagePane, BorderLayout.CENTER);
+                f.setVisible(true);
+            }
+        });
+
         setVisible(true);
         txtMessage.requestFocusInWindow();
     }
@@ -205,6 +234,9 @@ public class ClientUI extends JFrame implements Runnable {
                     } else if (message.startsWith("/f/")) {
                         String[] f = message.split("/f/|/n/|/e/");
                         updateFiles(Arrays.copyOfRange(f, 1, f.length - 1));
+                    } else if (message.startsWith("/mu/")) {
+                        String messageReceived = message.split("/mu/|/n/|/e/")[2];
+                        messagePane.receiveMessage(messageReceived);
                     } else {
                         System.out.println(message.substring(3));
                     }

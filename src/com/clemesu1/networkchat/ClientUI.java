@@ -117,7 +117,6 @@ public class ClientUI extends JFrame implements Runnable {
             @Override
             public void windowClosing(WindowEvent e) {
                 String disconnect = "/d/" + client.getID() + "/e/";
-                disconnect = AES.encrypt(disconnect, sendKey);
                 send(disconnect, false);
                 running = false;
                 client.close();

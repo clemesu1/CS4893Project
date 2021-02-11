@@ -243,7 +243,7 @@ public class Server implements Runnable {
         if (message.startsWith("/m/")) {
             String text = message.substring(3);
             text = text.split("/e/")[0];
-            System.out.println(text);
+            //System.out.println(text);
         }
         for (ServerClient client : clients) {
             send(message.getBytes(StandardCharsets.UTF_8), client.address, client.port);
@@ -286,7 +286,7 @@ public class Server implements Runnable {
         byte[] data = packet.getData();
         String string = new String(data);
 
-        // Decrypt packet.
+        // Decrypt received packet.
         string = decrypt(string, receiveKey);
 
         if (raw) System.out.println(string);

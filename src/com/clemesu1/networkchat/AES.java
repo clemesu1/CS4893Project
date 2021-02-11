@@ -12,6 +12,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Base64;
 
+/**
+ * https://howtodoinjava.com/java/java-security/aes-256-encryption-decryption/
+ */
+
 public class AES {
 
     private static SecretKeySpec secretKey;
@@ -35,7 +39,7 @@ public class AES {
             setKey(secret);
             Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
             cipher.init(Cipher.DECRYPT_MODE, secretKey);
-            return new String(cipher.doFinal(Base64.getDecoder().decode(message)));
+            return new String(cipher.doFinal(Base64.getMimeDecoder().decode(message)));
         } catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException | BadPaddingException | IllegalBlockSizeException e) {
             System.err.println("Error while decrypting: " + e);
         }

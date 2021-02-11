@@ -98,45 +98,20 @@ public class ClientUI extends JFrame implements Runnable {
             @Override
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    send(AES.encrypt(txtMessage.getText(), sendKey), true);
+                    send(txtMessage.getText(), true);
                 }
             }
         });
 
-        btnSend.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                send(AES.encrypt(txtMessage.getText(), sendKey), true);
-            }
-        });
+        btnSend.addActionListener(e -> send(txtMessage.getText(), true));
 
-        btnBrowse.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                handleBrowse();
-            }
-        });
+        btnBrowse.addActionListener(e -> handleBrowse());
 
-        btnUpload.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                handleUpload();
-            }
-        });
+        btnUpload.addActionListener(e -> handleUpload());
 
-        btnDownload.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                handleDownload();
-            }
-        });
+        btnDownload.addActionListener(e -> handleDownload());
 
-        fileList.addListSelectionListener(new ListSelectionListener() {
-            @Override
-            public void valueChanged(ListSelectionEvent e) {
-                lblFileSelected.setText(fileList.getSelectedValue());
-            }
-        });
+        fileList.addListSelectionListener(e -> lblFileSelected.setText(fileList.getSelectedValue()));
 
         addWindowListener(new WindowAdapter() {
             @Override

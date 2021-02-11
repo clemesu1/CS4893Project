@@ -19,6 +19,9 @@ public class Login extends JFrame {
     private JLabel lblPortEx;
     private JButton btnRegister;
 
+    private static final String sendKey = "thisisthekey";
+    private static final String receiveKey = "thisistheotherkey";
+
     public Login() {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());

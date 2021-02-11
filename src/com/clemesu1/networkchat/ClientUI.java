@@ -1,7 +1,5 @@
 package com.clemesu1.networkchat;
 
-import com.sun.deploy.appcontext.AppContext;
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.ListSelectionEvent;
@@ -15,22 +13,24 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 public class ClientUI extends JFrame implements Runnable {
-    private JPanel contentPane;
-    private JTextArea txtHistory;
+
+
     private JButton btnSend;
-    private JTextField txtMessage;
-    private JList<String> userList;
-    private JTabbedPane tabbedPane1;
-    private JPanel tabChatroom;
     private JButton btnUpload;
     private JButton btnDownload;
     private JButton btnBrowse;
+    private final JFrame loginWindow;
+    private JLabel lblFileSelected;
     private JList<String> fileList;
+    private JList<String> userList;
+    private JPanel contentPane;
+    private JPanel tabChatroom;
     private JPanel interfacePanel;
     private JPanel mediaPanel;
-    private JLabel lblFileSelected;
     private JPopupMenu popupMenu;
-    private JMenuItem directMessage;
+    private JTabbedPane tabbedPane1;
+    private JTextArea txtHistory;
+    private JTextField txtMessage;
     private MessagePane messagePane;
 
     private DefaultCaret caret;
@@ -40,7 +40,9 @@ public class ClientUI extends JFrame implements Runnable {
     private boolean running = false;
 
     private File selectedFile;
-    private JFrame loginWindow;
+
+    private static final String sendKey = "thisisthekey";
+    private static final String receiveKey = "thisistheotherkey";
 
     public ClientUI(String name, String password, String address, int port, boolean isLogin, JFrame loginWindow) {
         this.loginWindow = loginWindow;
@@ -60,6 +62,7 @@ public class ClientUI extends JFrame implements Runnable {
         if (isLogin) {
             // User logging into existing account.
             String connection = "/c/" + name + "/p/" + password + "/b/login/e/";
+            connection = AES.encrypt(connection, sendKey);
             client.send(connection.getBytes(StandardCharsets.UTF_8));
             createWindow();
             running = true;
@@ -68,6 +71,7 @@ public class ClientUI extends JFrame implements Runnable {
         } else {
             // User creating account.
             String connection = "/c/" + name + "/p/" + password + "/b/register/e/";
+            connection = AES.encrypt(connection, sendKey);
             client.send(connection.getBytes(StandardCharsets.UTF_8));
         }
     }
@@ -87,14 +91,14 @@ public class ClientUI extends JFrame implements Runnable {
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 
         popupMenu = new JPopupMenu("Message");
-        directMessage = new JMenuItem("Direct Message");
+        JMenuItem directMessage = new JMenuItem("Direct Message");
         popupMenu.add(directMessage);
 
         txtMessage.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    send(txtMessage.getText(), true);
+                    send(AES.encrypt(txtMessage.getText(), sendKey), true);
                 }
             }
         });
@@ -102,7 +106,7 @@ public class ClientUI extends JFrame implements Runnable {
         btnSend.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                send(txtMessage.getText(), true);
+                send(AES.encrypt(txtMessage.getText(), sendKey), true);
             }
         });
 
@@ -138,6 +142,7 @@ public class ClientUI extends JFrame implements Runnable {
             @Override
             public void windowClosing(WindowEvent e) {
                 String disconnect = "/d/" + client.getID() + "/e/";
+                disconnect = AES.encrypt(disconnect, sendKey);
                 send(disconnect, false);
                 running = false;
                 client.close();
@@ -182,6 +187,7 @@ public class ClientUI extends JFrame implements Runnable {
         int choice = JOptionPane.showConfirmDialog(null, "Upload " + fileName + "?", "Upload File", JOptionPane.YES_NO_OPTION);
         if (choice == JOptionPane.YES_OPTION) {
             String command = "/up/" + this.selectedFile.getName() + "/e/";
+            command = AES.encrypt(command, sendKey);
             client.send(command.getBytes(StandardCharsets.UTF_8));
             client.uploadFile(this.selectedFile);
         }
@@ -190,6 +196,7 @@ public class ClientUI extends JFrame implements Runnable {
     public void handleDownload() {
         if (fileList.getSelectedValue() != null) {
             String fileName = "/down/" + lblFileSelected.getText() + "/e/";
+            fileName = AES.encrypt(fileName, sendKey);
             client.send(fileName.getBytes(StandardCharsets.UTF_8));
             String fileLocation = "";
 
@@ -223,6 +230,8 @@ public class ClientUI extends JFrame implements Runnable {
             message = "/m/" + client.getName() + ": " + message + "/e/";
             txtMessage.setText("");
         }
+
+        message = AES.encrypt(message, sendKey);
         client.send(message.getBytes(StandardCharsets.UTF_8));
     }
 

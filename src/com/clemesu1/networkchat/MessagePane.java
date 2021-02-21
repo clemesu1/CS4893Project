@@ -2,8 +2,6 @@ package com.clemesu1.networkchat;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.nio.charset.StandardCharsets;
 
 public class MessagePane extends JPanel {
@@ -28,6 +26,7 @@ public class MessagePane extends JPanel {
             listModel.addElement(client.getName() + ": " + message);
             message = "/mu/" + username + "/n/" + client.getName() + ": " + message + "/e/";
             inputField.setText("");
+            message = AES.encrypt(message, ClientUI.sendKey);
             client.send(message.getBytes(StandardCharsets.UTF_8));
         });
     }

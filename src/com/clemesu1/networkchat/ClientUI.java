@@ -2,8 +2,6 @@ package com.clemesu1.networkchat;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.text.DefaultCaret;
 import java.awt.*;
@@ -41,8 +39,8 @@ public class ClientUI extends JFrame implements Runnable {
 
     private File selectedFile;
 
-    private static final String sendKey = "thisisthekey";
-    private static final String receiveKey = "thisistheotherkey";
+    public static final String sendKey = "thisisthekey";
+    public static final String receiveKey = "thisistheotherkey";
 
     public ClientUI(String name, String password, String address, int port, boolean isLogin, JFrame loginWindow) {
         this.loginWindow = loginWindow;
@@ -61,6 +59,7 @@ public class ClientUI extends JFrame implements Runnable {
 
         if (isLogin) {
             // User logging into existing account.
+            // Connection Login Packet: /c/[Username]/p/[Password]/b/login/e/
             String connection = "/c/" + name + "/p/" + password + "/b/login/e/";
             connection = AES.encrypt(connection, sendKey);
             client.send(connection.getBytes(StandardCharsets.UTF_8));
@@ -70,6 +69,7 @@ public class ClientUI extends JFrame implements Runnable {
             run.start();
         } else {
             // User creating account.
+            // Connection Register Packet: /c/[Username]/p/[Password]/b/register/e/
             String connection = "/c/" + name + "/p/" + password + "/b/register/e/";
             connection = AES.encrypt(connection, sendKey);
             client.send(connection.getBytes(StandardCharsets.UTF_8));
@@ -160,6 +160,7 @@ public class ClientUI extends JFrame implements Runnable {
         String fileName = this.selectedFile.getName();
         int choice = JOptionPane.showConfirmDialog(null, "Upload " + fileName + "?", "Upload File", JOptionPane.YES_NO_OPTION);
         if (choice == JOptionPane.YES_OPTION) {
+            // File Upload Packet: /up/[File_Name]/e/
             String command = "/up/" + this.selectedFile.getName() + "/e/";
             command = AES.encrypt(command, sendKey);
             client.send(command.getBytes(StandardCharsets.UTF_8));
@@ -169,9 +170,10 @@ public class ClientUI extends JFrame implements Runnable {
 
     public void handleDownload() {
         if (fileList.getSelectedValue() != null) {
-            String fileName = "/down/" + lblFileSelected.getText() + "/e/";
-            fileName = AES.encrypt(fileName, sendKey);
-            client.send(fileName.getBytes(StandardCharsets.UTF_8));
+            // File Download Packet: /down/[File_Name]/e/
+            String command = "/down/" + lblFileSelected.getText() + "/e/";
+            command = AES.encrypt(command, sendKey);
+            client.send(command.getBytes(StandardCharsets.UTF_8));
             String fileLocation = "";
 
             JFileChooser fc = new JFileChooser();
@@ -201,10 +203,10 @@ public class ClientUI extends JFrame implements Runnable {
     public void send(String message, boolean text) {
         if (message.equals("")) return;
         if (text) {
+            // Message Packet: /m/[Username]: [Message]/e/
             message = "/m/" + client.getName() + ": " + message + "/e/";
             txtMessage.setText("");
         }
-
         message = AES.encrypt(message, sendKey);
         client.send(message.getBytes(StandardCharsets.UTF_8));
     }
@@ -215,6 +217,7 @@ public class ClientUI extends JFrame implements Runnable {
             public void run() {
                 while (running) {
                     String message = client.receive();
+                    //String message = AES.decrypt(received, receiveKey);
                     if (message.startsWith("/c/")) {
                         setVisible(true);
                         loginWindow.dispose();
@@ -229,7 +232,12 @@ public class ClientUI extends JFrame implements Runnable {
                         send(text, false);
                     } else if (message.startsWith("/u/")) {
                         String[] u = message.split("/u/|/n/|/e/");
-                        updateUsers(Arrays.copyOfRange(u, 1, u.length - 1));
+
+                        String[] addUser = new String[u.length + 1];
+                        System.arraycopy(u, 0, addUser, 0, u.length);
+                        addUser[u.length] = "";
+
+                        updateUsers(Arrays.copyOfRange(addUser, 1, addUser.length - 1));
                     } else if (message.startsWith("/f/")) {
                         String[] f = message.split("/f/|/n/|/e/");
                         updateFiles(Arrays.copyOfRange(f, 1, f.length - 1));

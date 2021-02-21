@@ -16,8 +16,8 @@ import java.util.*;
 
 public class Server implements Runnable {
 
-    private final String FILE_LOCATION = "C:\\Users\\coliw\\Documents\\FileServer\\";
-    private final String USER_DATA_LOCATION = "C:\\Users\\coliw\\OneDrive\\Documents\\Project\\NetworkChat\\src\\com\\clemesu1\\networkchat\\server\\user_data.csv";
+    private final String FILE_LOCATION = "C:\\Users\\coliw\\OneDrive\\Documents\\FileServer\\";
+    private final String USER_DATA_LOCATION = "C:\\Users\\coliw\\OneDrive\\Documents\\GitHub\\CS4893Project\\src\\com\\clemesu1\\networkchat\\server\\user_data.csv";
 
     private List<ServerClient> clients = new ArrayList<>();
     private List<File> files = new ArrayList<>(Arrays.asList((new File(FILE_LOCATION).listFiles())));
@@ -70,7 +70,6 @@ public class Server implements Runnable {
                 clientSocket = serverSocket.accept();
                 output = new ObjectOutputStream(clientSocket.getOutputStream());
                 input = new ObjectInputStream(clientSocket.getInputStream());
-
             } catch (IOException ioException) {
                 ioException.printStackTrace();
             }
@@ -229,6 +228,7 @@ public class Server implements Runnable {
                     try {
                         socket.receive(packet);
                     } catch (SocketException e) {
+                        // Ignore.
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -243,10 +243,11 @@ public class Server implements Runnable {
         if (message.startsWith("/m/")) {
             String text = message.substring(3);
             text = text.split("/e/")[0];
-            //System.out.println(text);
+            System.out.println(text);
         }
+
         for (ServerClient client : clients) {
-            send(message.getBytes(StandardCharsets.UTF_8), client.address, client.port);
+            send(message, client.address, client.port);
         }
     }
 
@@ -257,20 +258,22 @@ public class Server implements Runnable {
 
         for (ServerClient client : clients) {
             if (client.getName().equals(toUser)) {
-                send(message.getBytes(StandardCharsets.UTF_8), client.address, client.port);
+                send(message, client.address, client.port);
                 break;
             }
         }
     }
 
-    private void send(String message, InetAddress address, int port) {
+    private void sendMessage(String message, InetAddress address, int port) {
         message += "/e/";
-        send(message.getBytes(StandardCharsets.UTF_8), address, port);
+        send(message, address, port);
     }
 
-    private void send(final byte[] data, final InetAddress address, final int port) {
+    private void send(final String message, final InetAddress address, final int port) {
         send = new Thread("Send") {
             public void run() {
+                String text = encrypt(message, sendKey);
+                final byte[] data = text.getBytes(StandardCharsets.UTF_8);
                 DatagramPacket packet = new DatagramPacket(data, data.length, address, port);
                 try {
                     socket.send(packet);
@@ -280,6 +283,15 @@ public class Server implements Runnable {
             }
         };
         send.start();
+    }
+
+    private byte[] fromHexString(String s) {
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i=0; i<len; i+=2) {
+            data[i/2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i+1), 16));
+        }
+        return data;
     }
 
     private void process(DatagramPacket packet) {
@@ -308,11 +320,11 @@ public class Server implements Runnable {
                 if (!isLoginCorrect(name, password)) {
                     // Invalid username.
                     String error = "/error/Login";
-                    send(error, packet.getAddress(), packet.getPort());
+                    sendMessage(error, packet.getAddress(), packet.getPort());
                 } else if (!isPasswordCorrect(name, password)) {
                     // Invalid password.
                     String error = "/error/Password";
-                    send(error, packet.getAddress(), packet.getPort());
+                    sendMessage(error, packet.getAddress(), packet.getPort());
                 } else {
                     // No errors detected. Attempting login.
 
@@ -329,7 +341,7 @@ public class Server implements Runnable {
 
                     // send ID to user
                     String id = "/c/" + ID;
-                    send(id, packet.getAddress(), packet.getPort());
+                    sendMessage(id, packet.getAddress(), packet.getPort());
 
                     // Update users and files.
                     updateUsers();
@@ -508,8 +520,6 @@ public class Server implements Runnable {
         if (status) {
             message = "User " + c.name + " (" + c.getID() + ") @ " + c.address.toString() + ":" + c.port + " disconnected.";
             send = "User " + c.name + " has disconnected.";
-            sendToAll(send);
-
         } else {
             message = "User " + c.name + " (" + c.getID() + ") @ " + c.address.toString() + ":" + c.port + " timed out.";
             send = "User " + c.name + " has timed out.";
@@ -536,7 +546,7 @@ public class Server implements Runnable {
             setKey(secret);
             Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
             cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-            return Base64.getEncoder().encodeToString(cipher.doFinal(message.getBytes(StandardCharsets.UTF_8)));
+            return Base64.getMimeEncoder().encodeToString(cipher.doFinal(message.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException
                 | BadPaddingException | IllegalBlockSizeException e) {
             System.err.println("Error while encrypting: " + e);

@@ -2,6 +2,7 @@ package com.clemesu1.networkchat;
 
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 
 public class Client {
 
@@ -15,6 +16,9 @@ public class Client {
 
     private ObjectInputStream input;
     private ObjectOutputStream output;
+
+    private static final String sendKey = "thisisthekey";
+    private static final String receiveKey = "thisistheotherkey";
 
     public Client(String name, String password, String address, int port) {
         this.name = name;
@@ -85,6 +89,7 @@ public class Client {
             ioException.printStackTrace();
         }
         String message = new String(packet.getData());
+        message = AES.decrypt(message, receiveKey);
         return message;
     }
 
